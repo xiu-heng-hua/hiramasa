@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/hiramasa
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Reclaim disk space on the runner
+        run: sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache
+
+      - name: Log in to GHCR
+        run: |
+          mkdir -p ~/.docker
+          echo "${{ github.token }}" | podman login ghcr.io --username ${{ github.actor }} --password-stdin --authfile ~/.docker/config.json
+
+      - name: Build the image
+        run: sudo podman build --tag localhost/hiramasa .
+
+      - name: Rechunk the image
+        run: |
+          previous=()
+          if skopeo inspect --authfile ~/.docker/config.json "docker://${IMAGE}:latest" >/dev/null 2>&1; then
+            previous=(--previous-build "docker://${IMAGE}:latest")
+          fi
+          printf '{"default":[{"type":"insecureAcceptAnything"}]}' > build-policy.json
+          sudo podman run --rm --privileged \
+            --volume /var/lib/containers/storage:/var/lib/containers/storage \
+            --volume "${PWD}/build-policy.json:/etc/containers/policy.json:ro" \
+            --volume ~/.docker/config.json:/auth.json:ro \
+            --env REGISTRY_AUTH_FILE=/auth.json \
+            localhost/hiramasa \
+            rpm-ostree compose build-chunked-oci --bootc \
+              --from localhost/hiramasa \
+              "${previous[@]}" \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --output containers-storage:localhost/hiramasa:chunked
+
+      - name: Push and sign
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
+        run: |
+          trap 'rm -f signing.key signing.pass' EXIT
+          printf '%s' "${SIGNING_KEY}" > signing.key
+          printf '%s' "${SIGNING_PASSPHRASE}" > signing.pass
+          for tag in "$(date --rfc-3339=date)" latest; do
+            sudo skopeo copy \
+              --authfile ~/.docker/config.json \
+              --registries.d rootfs/etc/containers/registries.d \
+              --sign-by-sigstore-private-key signing.key \
+              --sign-passphrase-file signing.pass \
+              containers-storage:localhost/hiramasa:chunked \
+              "docker://${IMAGE}:${tag}"
+          done

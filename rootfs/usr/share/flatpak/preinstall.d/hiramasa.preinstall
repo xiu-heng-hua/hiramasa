@@ -1,0 +1,5 @@
+[Flatpak Preinstall com.bitwarden.desktop]
+Branch=stable
+
+[Flatpak Preinstall com.discordapp.Discord]
+Branch=stable
