@@ -302,6 +302,11 @@ without a tmpfiles entry, and the directories libvirt drags in reach further
 than libvirt: `swtpm` for emulated TPMs, and `iscsi-initiator-utils`, which
 arrives with the iSCSI storage driver and recreates nothing at all.
 
+The one directory [`build.sh`][build] deletes rather than declares is
+`/var/lib/rpm-state`, which `rpm` makes while `dnf` works. Silverblue does not
+ship it and nothing asks for it at runtime, so removing it leaves the image's
+`/var` as the base image has it.
+
 Connecting to the system libvirt asks for an administrator password unless the
 account is in the `libvirt` group. That is a per-machine change, so no image can
 make it:

@@ -46,3 +46,5 @@ dnf remove console-setup
 glib-compile-schemas /usr/share/glib-2.0/schemas
 
 systemctl enable brew-setup.service brew-update.timer brew-upgrade.timer
+
+rm -rf /var/lib/rpm-state
