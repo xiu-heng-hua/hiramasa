@@ -37,9 +37,13 @@ is a default in [`zz-hiramasa.gschema.override`][gschema], so changing any of it
 in Settings works and sticks.
 
 [Flathub](https://flathub.org/) is preconfigured, and
-[Bitwarden](https://bitwarden.com/) and [Discord](https://discord.com/) are
-declared in
-[`rootfs/usr/share/flatpak/preinstall.d/hiramasa.preinstall`][preinstall].
+[`rootfs/usr/share/flatpak/preinstall.d/hiramasa.preinstall`][preinstall] names
+the applications to install: [Bitwarden](https://bitwarden.com/),
+[Discord](https://discord.com/) and [Gear
+Lever](https://mijorus.it/projects/gearlever/), which integrates AppImages into
+the desktop, alongside the six GNOME applications the desktop itself reaches
+for — Sushi for the spacebar preview in Files, Extensions, Characters, Fonts,
+Image Viewer and Document Viewer.
 Nothing installs them on its own; run this once on a new machine:
 
 ```sh
@@ -421,7 +425,34 @@ uninstalling a preinstalled one is a permanent opt-out.
 The applications themselves are not in the image, and never were: on Silverblue
 the GNOME set arrives as Fedora Flatpaks placed by the installer, which is why a
 machine reaching this image through `bootc switch` keeps them and a fresh
-installation has none.
+installation has none. The set is eighteen applications, listed as
+`flatpak_remote_refs` under `^Silverblue$` in [pungi-fedora's
+`fedora.conf`][pungi]. Six of them are not really applications you choose but
+parts of the desktop shipped separately — Sushi is what Files calls for the
+spacebar preview, and Extensions, Characters, Fonts, Image Viewer and Document
+Viewer are the only graphical way to reach what they cover — so those six are
+named in the config and the other twelve are left out.
+
+### Which remote a preinstall comes from is decided by name
+
+A `.preinstall` group names a ref, never a remote: the only keys are `Install`,
+`Branch`, `IsRuntime` and `CollectionID`. Flatpak walks the enabled remotes in
+order and takes the first one carrying the ref, and that order is by priority
+first, then `strcmp` on the name. Both remotes here sit at the default priority
+1, so `fedora` sorts before `flathub` and wins every tie.
+
+It only matters for refs both remotes carry, which is exactly the six GNOME
+applications: they arrive as Fedora Flatpaks on `org.fedoraproject.Platform`
+rather than the Flathub builds on `org.gnome.Platform`. Bitwarden, Discord and
+Gear Lever are on Flathub alone and are unaffected. Pinning the Flathub build
+would mean giving that remote a collection ID and naming it with `CollectionID`,
+or raising its priority above `fedora`; neither is done, because the Fedora
+build of a GNOME application tracks the same release as the shell.
+
+That remote is not configured here. `flatpak-add-fedora-repos.service`, shipped
+and enabled by the `flatpak` package itself, adds `fedora` and a disabled
+`fedora-testing` on first boot, then drops `/var/lib/flatpak/.fedora-initialized`
+so it never runs again.
 
 ### Flatpak permissions come through tmpfiles
 
@@ -531,6 +562,7 @@ editing the `FROM` line.
 [policy]: rootfs/etc/containers/policy.json
 [preinstall]: rootfs/usr/share/flatpak/preinstall.d/hiramasa.preinstall
 [pubkey]: rootfs/etc/pki/containers/hiramasa.pub
+[pungi]: https://forge.fedoraproject.org/releng/pungi-fedora/src/branch/f44/fedora.conf
 [registries]: rootfs/etc/containers/registries.d/hiramasa.yaml
 [tmpfiles]: rootfs/usr/lib/tmpfiles.d/hiramasa.conf
 [vconsole]: rootfs/etc/vconsole.conf

@@ -3,3 +3,24 @@ Branch=stable
 
 [Flatpak Preinstall com.discordapp.Discord]
 Branch=stable
+
+[Flatpak Preinstall it.mijorus.gearlever]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.Characters]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.Extensions]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.font-viewer]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.Loupe]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.NautilusPreviewer]
+Branch=stable
+
+[Flatpak Preinstall org.gnome.Papers]
+Branch=stable
