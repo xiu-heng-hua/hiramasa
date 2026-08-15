@@ -17,7 +17,7 @@ layer that updates without rebuilding or rebooting.
 | --- | --- | --- |
 | Image | desktop, codecs, terminal, editors | this repository |
 | [Flatpak](https://flatpak.org/) | GUI applications | [`hiramasa.preinstall`][preinstall] |
-| Homebrew | command-line tools | you, per machine |
+| [Homebrew](https://brew.sh/) | command-line tools | you, per machine |
 
 On top of stock Silverblue the image adds [Ghostty](https://ghostty.org/) as the
 only terminal, [Zed](https://zed.dev/), [Claude
@@ -50,10 +50,10 @@ Nothing installs them on its own; run this once on a new machine:
 sudo flatpak preinstall
 ```
 
-Command-line tools are not in the image, but [Homebrew](https://brew.sh/) is. It
-unpacks itself on first boot, so `brew install` works with nothing to set up. It
-lives in `/home/linuxbrew`, which is machine-local, so it never touches `/usr`
-and survives image updates.
+Command-line tools are not in the image, but Homebrew is. It unpacks itself on
+first boot, so `brew install` works with nothing to set up. It lives in
+`/home/linuxbrew`, which is machine-local, so it never touches `/usr` and
+survives image updates.
 
 ## Installing
 
