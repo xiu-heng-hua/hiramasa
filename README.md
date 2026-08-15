@@ -385,6 +385,16 @@ as well as `gpgcheck=1`. They are not the same check: `gpgcheck` verifies the
 packages, and `repo_gpgcheck` verifies the repository metadata that says which
 packages exist. That repository signs its metadata, so both are checked.
 
+### Terra is reached by its baseurl, not its metalink
+
+`terra-release` configures the repository with a metalink, and in August 2026
+that metalink began advertising a `repomd.xml` checksum none of Terra's mirrors
+serve. Every mirror is consistent with itself and none matches what the metalink
+asks for, so `dnf` rejects the repository and the build fails with `No match for
+argument: zed`. [`build.sh`][build] therefore clears the metalink and points the
+repository at its baseurl. That costs the mirror list and buys a build that does
+not depend on Terra's metalink agreeing with Terra's mirrors.
+
 ### Signature verification needs three files, not one
 
 Shipping [`rootfs/etc/pki/containers/hiramasa.pub`][pubkey] and a
@@ -419,6 +429,27 @@ previous build it reads over the network, and a build cannot start until a
 verifiable image is already published. Nothing is trusted by doing so:
 `--previous-build` only shapes the layer plan, and every byte of the new image
 comes from the local build.
+
+### The rpmdb survives the build but not the layer
+
+`dnf` leaves `/usr/share/rpm/rpmdb.sqlite` sound. Read at the end of
+[`build.sh`][build] it holds every package and `pragma integrity_check` returns
+`ok`. Read back from the committed image it does not: pages of an index return
+`btreeInitPage() returns error code 11`, `rpm -qa` stops partway through, and
+`rpm-ostree compose build-chunked-oci` — which reads the database out of the
+commit it has just made, to map files to packages — fails with `database disk
+image is malformed`. The build passes; the rechunk after it does not.
+
+Why is not certain. The shape of it, writes visible inside the container but
+missing from the layer that gets committed, is what happens when a file modified
+through a memory mapping is copied up on overlayfs, and a memory mapping is how
+rpm writes that database. It appears on the builder and not on a machine
+building the same image by hand.
+
+The last thing [`build.sh`][build] does is therefore copy the database and move
+the copy into place, so that what lands in the image was written sequentially.
+The database is taken out of WAL mode first, which drops the `-shm` index that a
+read-only `/usr` could not recreate in any case.
 
 ### Preinstalled Flatpaks have to be asked for
 

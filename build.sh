@@ -17,6 +17,8 @@ dnf install \
 
 dnf install --nogpgcheck --repofrompath "terra,https://repos.fyralabs.com/terra\$releasever" terra-release
 
+dnf config-manager setopt terra.metalink="" terra.baseurl="https://repos.fyralabs.com/terra\$releasever/"
+
 dnf swap --allowerasing ffmpeg-free ffmpeg
 
 dnf install \
@@ -48,3 +50,13 @@ glib-compile-schemas /usr/share/glib-2.0/schemas
 systemctl enable brew-setup.service brew-update.timer brew-upgrade.timer
 
 rm -rf /var/lib/rpm-state
+
+python3 -c "
+import sqlite3
+db = sqlite3.connect('/usr/share/rpm/rpmdb.sqlite')
+db.execute('pragma journal_mode = delete')
+db.close()
+"
+
+cp /usr/share/rpm/rpmdb.sqlite /usr/share/rpm/.rpmdb.rewritten
+mv /usr/share/rpm/.rpmdb.rewritten /usr/share/rpm/rpmdb.sqlite
