@@ -291,11 +291,16 @@ hardware would.
 
 What the packages cannot bring is their own state. They own directories under
 `/var`, and an image seeds `/var` only on a fresh installation, so a machine
-that arrived by `bootc switch` has none of them. The daemons recreate some on
-their own — the cache, `/var/lib/libvirt/dnsmasq`, and everything under
-`/var/lib/libvirt/qemu` — and [tmpfiles][tmpfiles] creates the rest at the modes
-the packages use. The one that matters most is `/var/lib/libvirt/images`, the
-default storage pool: without it no virtual machine can be created at all.
+that arrived by `bootc switch` has none of them. [tmpfiles][tmpfiles] creates
+them at the modes the packages use. The one that matters most is
+`/var/lib/libvirt/images`, the default storage pool: without it no virtual
+machine can be created at all.
+
+Every one of them is listed, including those a daemon would recreate by itself.
+`bootc container lint` warns about any directory left in the image's `/var`
+without a tmpfiles entry, and the directories libvirt drags in reach further
+than libvirt: `swtpm` for emulated TPMs, and `iscsi-initiator-utils`, which
+arrives with the iSCSI storage driver and recreates nothing at all.
 
 Connecting to the system libvirt asks for an administrator password unless the
 account is in the `libvirt` group. That is a per-machine change, so no image can
