@@ -415,23 +415,6 @@ verifiable image is already published. Nothing is trusted by doing so:
 `--previous-build` only shapes the layer plan, and every byte of the new image
 comes from the local build.
 
-### The rpmdb has to leave WAL mode
-
-`dnf` leaves `/usr/lib/sysimage/rpm/rpmdb.sqlite` in SQLite's write-ahead
-logging mode, which keeps an `rpmdb.sqlite-shm` index beside it. Committed into
-an image that index is frozen, and `rpm-ostree compose build-chunked-oci` reads
-the database back out of the commit it has just made to map files to packages.
-A frozen index that no longer describes the database reads as `database disk
-image is malformed`, and the rechunk step fails after the build itself has
-passed.
-
-`rpm-ostree` cleans this up when it composes a tree of its own
-([rpm#2219][rpm-2219]), but `build-chunked-oci` is handed a rootfs somebody else
-built and does not. [`build.sh`][build] therefore ends by switching the database
-to `delete` journal mode, which checkpoints the log and removes both sidecar
-files. That suits a read-only `/usr` better anyway: a WAL database cannot be
-opened without its index, and nothing can create one there.
-
 ### Preinstalled Flatpaks have to be asked for
 
 `flatpak preinstall` reads
@@ -586,7 +569,6 @@ editing the `FROM` line.
 [pubkey]: rootfs/etc/pki/containers/hiramasa.pub
 [pungi]: https://forge.fedoraproject.org/releng/pungi-fedora/src/branch/f44/fedora.conf
 [registries]: rootfs/etc/containers/registries.d/hiramasa.yaml
-[rpm-2219]: https://github.com/rpm-software-management/rpm/issues/2219
 [tmpfiles]: rootfs/usr/lib/tmpfiles.d/hiramasa.conf
 [vconsole]: rootfs/etc/vconsole.conf
 [workflow]: .github/workflows/build.yml

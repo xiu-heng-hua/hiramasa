@@ -46,10 +46,3 @@ dnf remove console-setup
 glib-compile-schemas /usr/share/glib-2.0/schemas
 
 systemctl enable brew-setup.service brew-update.timer brew-upgrade.timer
-
-python3 -c "
-import sqlite3
-db = sqlite3.connect('/usr/lib/sysimage/rpm/rpmdb.sqlite')
-db.execute('pragma journal_mode = delete')
-db.close()
-"
