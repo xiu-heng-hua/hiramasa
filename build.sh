@@ -49,8 +49,6 @@ glib-compile-schemas /usr/share/glib-2.0/schemas
 
 systemctl enable brew-setup.service brew-update.timer brew-upgrade.timer
 
-rm -rf /var/lib/rpm-state
-
 python3 -c "
 import sqlite3
 db = sqlite3.connect('/usr/share/rpm/rpmdb.sqlite')
