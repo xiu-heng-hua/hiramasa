@@ -38,26 +38,10 @@ jobs:
           echo "${{ github.token }}" | podman login ghcr.io --username ${{ github.actor }} --password-stdin --authfile ~/.docker/config.json
 
       - name: Build the image
-        run: sudo podman build --tag localhost/hiramasa .
-
-      - name: Rechunk the image
         run: |
-          previous=()
-          if skopeo inspect --authfile ~/.docker/config.json "docker://${IMAGE}:latest" >/dev/null 2>&1; then
-            previous=(--previous-build "docker://${IMAGE}:latest")
-          fi
-          printf '{"default":[{"type":"insecureAcceptAnything"}]}' > build-policy.json
-          sudo podman run --rm --privileged \
-            --volume /var/lib/containers/storage:/var/lib/containers/storage \
-            --volume "${PWD}/build-policy.json:/etc/containers/policy.json:ro" \
-            --volume ~/.docker/config.json:/auth.json:ro \
-            --env REGISTRY_AUTH_FILE=/auth.json \
-            localhost/hiramasa \
-            rpm-ostree compose build-chunked-oci --bootc \
-              --from localhost/hiramasa \
-              "${previous[@]}" \
-              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-              --output containers-storage:localhost/hiramasa:chunked
+          sudo podman build \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --tag localhost/hiramasa .
 
       - name: Push and sign
         env:
@@ -73,6 +57,6 @@ jobs:
               --registries.d rootfs/etc/containers/registries.d \
               --sign-by-sigstore-private-key signing.key \
               --sign-passphrase-file signing.pass \
-              containers-storage:localhost/hiramasa:chunked \
+              containers-storage:localhost/hiramasa \
               "docker://${IMAGE}:${tag}"
           done

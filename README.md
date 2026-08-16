@@ -79,9 +79,9 @@ sudo bootc upgrade
 sudo systemctl reboot
 ```
 
-Builds run nightly at 00:00 UTC. Downloads are small because the image is
-rechunked into package-aligned layers, so an update transfers only the layers
-that changed.
+Builds run nightly at 00:00 UTC. An update transfers the one layer holding
+everything this repository adds, and the base image's own layers whenever Fedora
+republishes them.
 
 ## Rolling back
 
@@ -191,7 +191,7 @@ Containerfile   the image
 build.sh        repositories, packages, generated files
 rootfs/         files copied into the image as-is
 .github/workflows/build.yml
-                nightly build, rechunk, push and sign
+                nightly build, push and sign
 ```
 
 Changing what the image contains means editing [`build.sh`][build] or adding a
@@ -423,22 +423,32 @@ referrer, and the policy above reads only the older `sha256-<digest>.sig` tag.
 The result is an image that looks signed and cannot be verified. skopeo signs
 through the same library that verifies, so the two agree.
 
-The rechunk step in the same file mounts a permissive policy over `policy.json`.
-It runs from the built image, so otherwise the image's own policy applies to the
-previous build it reads over the network, and a build cannot start until a
-verifiable image is already published. Nothing is trusted by doing so:
-`--previous-build` only shapes the layer plan, and every byte of the new image
-comes from the local build.
+### Nothing rechunks the image
+
+This repository used to run `rpm-ostree compose build-chunked-oci` over the
+built image, splitting it into package-aligned layers so an update would carry
+only what changed. It never did that. The layer plan is rebuilt from scratch
+unless `--previous-build` supplies a baseline, and that flag could not take
+effect: `build-chunked-oci` marks each layer it writes with an
+`ostree.components` annotation and looks for that annotation to recognise its
+own output, but pushing from `containers-storage` recompresses every layer, and
+the manifest skopeo writes in place of the original carries no layer annotations
+at all. Every build logged `Found existing image at target but it's not chunked`
+and started over. Measured across consecutive published tags, 41 to 44 of 65
+layers changed nightly — about three quarters of the image.
+
+Without it the image is the base image's layers, inherited unchanged, plus one
+layer holding everything [`build.sh`][build] adds. That also removes a
+privileged container, a bind mount of the host's container storage, and a
+permissive `policy.json` mounted over the image's own.
 
 ### The rpmdb survives the build but not the layer
 
 `dnf` leaves `/usr/share/rpm/rpmdb.sqlite` sound. Read at the end of
 [`build.sh`][build] it holds every package and `pragma integrity_check` returns
 `ok`. Read back from the committed image it does not: pages of an index return
-`btreeInitPage() returns error code 11`, `rpm -qa` stops partway through, and
-`rpm-ostree compose build-chunked-oci` — which reads the database out of the
-commit it has just made, to map files to packages — fails with `database disk
-image is malformed`. The build passes; the rechunk after it does not.
+`btreeInitPage() returns error code 11` and `rpm -qa` stops partway through. The
+build passes and the image ships a package database that cannot be read.
 
 Why is not certain. The shape of it, writes visible inside the container but
 missing from the layer that gets committed, is what happens when a file modified
