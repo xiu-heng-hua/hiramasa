@@ -438,10 +438,14 @@ at all. Every build logged `Found existing image at target but it's not chunked`
 and started over. Measured across consecutive published tags, 41 to 44 of 65
 layers changed nightly — about three quarters of the image.
 
-Without it the image is the base image's layers, inherited unchanged, plus one
-layer holding everything [`build.sh`][build] adds. That also removes a
-privileged container, a bind mount of the host's container storage, and a
-permissive `policy.json` mounted over the image's own.
+Without it the image is the base image's layers plus one holding everything
+[`build.sh`][build] adds. Those layers are not the ones Fedora published —
+pushing from `containers-storage` recompresses every one of them, so none of the
+digests survive — but they are stable from build to build: two builds from an
+unchanged base share 65 of 66 layer digests. Only the layer this repository adds
+changes nightly. It also removes a privileged container, a bind mount of the
+host's container storage, and a permissive `policy.json` mounted over the
+image's own.
 
 ### The runner's container storage has to be reconfigured
 
@@ -465,6 +469,8 @@ change having no effect.
 Reading the database back and failing on `pragma integrity_check` is the step
 after the build. Nothing else in the pipeline reads it, so without that check a
 return of the corruption would be found on the machine rather than in the build.
+A build on any other machine configured the same way is affected in the same
+way, and nothing there checks at all.
 
 [`build.sh`][build] still takes the database out of WAL mode at the end, which
 drops the `-shm` index that a read-only `/usr` could not recreate. That is
@@ -511,8 +517,8 @@ build of a GNOME application tracks the same release as the shell.
 
 That remote is not configured here. `flatpak-add-fedora-repos.service`, shipped
 and enabled by the `flatpak` package itself, adds `fedora` and a disabled
-`fedora-testing` on first boot, then drops `/var/lib/flatpak/.fedora-initialized`
-so it never runs again.
+`fedora-testing` on first boot, then drops
+`/var/lib/flatpak/.fedora-initialized` so it never runs again.
 
 ### Flatpak permissions come through tmpfiles
 
@@ -555,7 +561,7 @@ Software does: it runs as a user service, asks `rpm-ostreed` for a new image and
 stages it. Enabling a timer as well would mean two things pulling the same
 image.
 
-### Homebrew ships as a tarball, and only one of its units is enabled
+### Homebrew ships as a tarball, and its units need enabling by hand
 
 Homebrew cannot be installed during the build. It lives in `/home/linuxbrew`,
 which is `/var`, and `/var` in an image only seeds a fresh installation — a
@@ -566,8 +572,9 @@ carries `usr/share/homebrew.tar.zst` from `ghcr.io/ublue-os/brew`, and
 That image is tracked by tag rather than digest, so it can change between
 builds.
 
-It also ships `brew-update.timer` and `brew-upgrade.timer`, which refresh and
-upgrade brew packages every eight hours. All three units are enabled.
+It also ships `brew-update.timer`, which refreshes the formula index every six
+hours, and `brew-upgrade.timer`, which upgrades installed packages every eight.
+All three units are enabled.
 
 `01-homebrew.preset` asks for exactly those three, but a preset is only a policy
 file and nothing in this build applies it — copying the files enables nothing,
