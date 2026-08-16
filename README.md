@@ -442,24 +442,32 @@ layer holding everything [`build.sh`][build] adds. That also removes a
 privileged container, a bind mount of the host's container storage, and a
 permissive `policy.json` mounted over the image's own.
 
-### The rpmdb survives the build but not the layer
+### The runner's container storage has to be reconfigured
 
-`dnf` leaves `/usr/share/rpm/rpmdb.sqlite` sound. Read at the end of
-[`build.sh`][build] it holds every package and `pragma integrity_check` returns
-`ok`. Read back from the committed image it does not: pages of an index return
-`btreeInitPage() returns error code 11` and `rpm -qa` stops partway through. The
-build passes and the image ships a package database that cannot be read.
+GitHub's runner image points podman's overlay driver at fuse-overlayfs, a
+userspace implementation, by setting `mount_program` in
+`/etc/containers/storage.conf`. Every file operation on an image of a hundred
+thousand files then goes through FUSE, and two things follow. A build takes
+thirty-five minutes rather than five. And the rpm database comes out of the
+layer corrupt: pages of an index return `btreeInitPage() returns error code 11`
+and `rpm -qa` stops partway through, which is [a known fuse-overlayfs
+bug][fuse-459]. The database is sound at the end of [`build.sh`][build] and
+broken when read back from the committed image.
 
-Why is not certain. The shape of it, writes visible inside the container but
-missing from the layer that gets committed, is what happens when a file modified
-through a memory mapping is copied up on overlayfs, and a memory mapping is how
-rpm writes that database. It appears on the builder and not on a machine
-building the same image by hand.
+[`build.yml`][workflow] therefore deletes `mount_program`, along with the
+`mountopt` line whose `fsync=0` means nothing to the kernel's overlayfs. It also
+removes `/var/lib/containers/storage`, because podman records its options when
+it first initialises the store: editing the file after any podman command has
+run changes nothing at all, which is easy to miss and looks exactly like the
+change having no effect.
 
-The last thing [`build.sh`][build] does is therefore copy the database and move
-the copy into place, so that what lands in the image was written sequentially.
-The database is taken out of WAL mode first, which drops the `-shm` index that a
-read-only `/usr` could not recreate in any case.
+Reading the database back and failing on `pragma integrity_check` is the step
+after the build. Nothing else in the pipeline reads it, so without that check a
+return of the corruption would be found on the machine rather than in the build.
+
+[`build.sh`][build] still takes the database out of WAL mode at the end, which
+drops the `-shm` index that a read-only `/usr` could not recreate. That is
+tidiness, not a fix.
 
 ### Preinstalled Flatpaks have to be asked for
 
@@ -608,6 +616,7 @@ editing the `FROM` line.
 [ff-policies]: rootfs/usr/lib64/firefox/distribution/policies.json
 [ff-prefs]: rootfs/usr/lib64/firefox/browser/defaults/preferences/00-hiramasa.js
 [flathub]: rootfs/usr/share/flatpak/remotes.d/flathub.flatpakrepo
+[fuse-459]: https://github.com/containers/fuse-overlayfs/issues/459
 [gschema]: rootfs/usr/share/glib-2.0/schemas/zz-hiramasa.gschema.override
 [install-cfg]: rootfs/usr/lib/bootc/install
 [policy]: rootfs/etc/containers/policy.json

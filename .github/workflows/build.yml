@@ -32,6 +32,11 @@ jobs:
       - name: Reclaim disk space on the runner
         run: sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache
 
+      - name: Take podman off fuse-overlayfs
+        run: |
+          sudo sed -i -e '/mount_program/d' -e '/^mountopt/d' /etc/containers/storage.conf
+          sudo rm -rf /var/lib/containers/storage
+
       - name: Log in to GHCR
         run: |
           mkdir -p ~/.docker
@@ -42,6 +47,10 @@ jobs:
           sudo podman build \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --tag localhost/hiramasa .
+
+      - name: Check the rpmdb survived the build
+        run: |
+          sudo podman run --rm localhost/hiramasa python3 -c "import sqlite3, sys; c = sqlite3.connect('file:/usr/share/rpm/rpmdb.sqlite?mode=ro', uri=True); n = c.execute('select count(*) from Packages').fetchone()[0]; r = c.execute('pragma integrity_check').fetchall(); print(n, 'packages, integrity', r); sys.exit(0 if r == [('ok',)] and n > 1500 else 1)"
 
       - name: Push and sign
         env:

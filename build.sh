@@ -57,6 +57,3 @@ db = sqlite3.connect('/usr/share/rpm/rpmdb.sqlite')
 db.execute('pragma journal_mode = delete')
 db.close()
 "
-
-cp /usr/share/rpm/rpmdb.sqlite /usr/share/rpm/.rpmdb.rewritten
-mv /usr/share/rpm/.rpmdb.rewritten /usr/share/rpm/rpmdb.sqlite
